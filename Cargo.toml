@@ -1,0 +1,9 @@
+[package]
+name = "markup-parser"
+version = "0.1.0"
+edition = "2018"
+description = "A state machine based xml parser"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
