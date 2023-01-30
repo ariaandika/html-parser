@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "markup-parser"
+name = "html-parser"
 version = "0.1.0"
