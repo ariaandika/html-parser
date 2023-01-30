@@ -1,10 +1,9 @@
 #![allow(dead_code)]
 
-use std::{str::Chars, vec, process::exit};
+use std::{str::Chars, vec, process::exit, fs, env};
 
-fn unexpected(iter: Chars, value: char,context: &str, expected: &str) -> ! {
-    iter.for_each(|e|print!("{e}"));
-    println!("\nUnexpected {context}: {value}\nExpecting {expected}");
+fn unexpected(mut _iter: Chars, value: char,context: &str, expected: &str) -> ! {
+    println!("Unexpected {}: {:#?}\nExpecting {:#?}",context,value,expected);
     exit(1);
 }
 fn unexpected_str(value: &str,context: &str, expected: &str) -> ! {
@@ -14,9 +13,8 @@ fn unexpected_str(value: &str,context: &str, expected: &str) -> ! {
 
 
 #[derive(Debug)]
-struct Root {
+struct TreeElement {
     tag: String,
-    attr: Vec<(String,String)>,
     childs: Vec<Element>
 }
 #[derive(Debug)]
@@ -25,58 +23,74 @@ struct Element {
     attr: Vec<(String,String)>,
     scope: u16,
     inner: String,
-    relation: Vec<Element>
+    childs: Vec<Element>
 }
-impl Root {
-    fn new() -> Root {
-        Self { tag: "root".to_string(), attr: vec![], childs: vec![] }
+impl TreeElement {
+    fn new() -> TreeElement {
+        Self { tag: "root".to_string(), childs: vec![] }
     }
 }
 impl Element {
     fn new() -> Element {
-        Self { tag: "".to_string(), attr: vec![], scope: 0, inner: String::new(), relation: vec![] }
+        Self { tag: "".to_string(), attr: vec![], scope: 0, inner: String::new(), childs: vec![] }
     }
 }
 
 
 
 fn main() {
-    let input = 
-    "<section className=\"m-6 p-4 bg-white shadow-md rounded-md\"><main>Main article<aside>aside bar</aside></main><h1 className=\"text-4xl font-bold\">Title</h1><button>Count : {count}</button></section>";
+    let args: Vec<String> = env::args().collect();
     
-    parse(input);
+    if args.len() == 1 {
+        println!("Please input a file path");
+        exit(1);
+    }
+    
+    let binding = env::current_dir().unwrap();
+    let cwd = binding.to_str().unwrap();
+    let file_path = format!("{}\\{}",cwd,&args[1]);
+    
+    let content = fs::read_to_string(file_path).unwrap_or_else(|err|{
+        println!("Error: cannot read file:\n\t{}",err);
+        exit(1);
+    }).replace("\r", "");
+    
+    parse( content );
 }
-fn parse(input: &str) {
+fn parse(input:String) {
     let chars = input.chars();
-    let mut root_element = Root::new();
-    
+    let mut root_element = TreeElement::new();
     root(chars, &mut root_element);
-    println!("{:#?}",root_element);
+    println!("Result {:#?}",root_element);
 }
 
 
 // new root
-fn root(mut iter: Chars, data: &mut Root){
-    let subject = Element::new();
-    match iter.next() {
-        Some('<') => {
-            let mut subject = identifier(iter, vec![subject]);
-            
-            let parent = {
-                let mut state = subject.pop().unwrap();
-                while !subject.is_empty() {
-                    let mut parent = subject.pop().unwrap();
-                    parent.relation.push(state);
-                    state = parent;
-                }
-                state
-            };
-            
-            data.childs.push(parent);
-        },
-        Some(er) => unexpected(iter, er, "symbol", "<"),
-        None => return,
-    };
+fn root(mut iter: Chars, data: &mut TreeElement){
+    let mut subject = Element::new();
+    subject.tag = "root".to_string();
+    loop {
+        match iter.next() {
+            Some(chr) if chr.is_whitespace() => continue,
+            Some('<') => {
+                let mut subject = identifier(iter, vec![subject]);
+                
+                let parent = {
+                    let mut state = subject.pop().unwrap();
+                    while !subject.is_empty() {
+                        let mut parent = subject.pop().unwrap();
+                        parent.childs.push(state);
+                        state = parent;
+                    }
+                    state
+                };
+                data.childs.push(parent);
+                break;
+            },
+            Some(er) => unexpected(iter, er, "symbol", "<"),
+            None => return,
+        };
+    }
 }
 
 fn identifier(mut iter: Chars, mut subject: Vec<Element>) -> Vec<Element> {
@@ -99,7 +113,7 @@ fn identifier(mut iter: Chars, mut subject: Vec<Element>) -> Vec<Element> {
                                 
                                 // go upper scope and move to "new_tag" state
                                 let child = subject.pop().unwrap();
-                                subject.last_mut().unwrap().relation.push(child);
+                                subject.last_mut().unwrap().childs.push(child);
                                 return new_tag(iter, subject)
                             }
                             unexpected_str(&closing_tag, "closing identifier tag", &subject.last_mut().unwrap().tag)
@@ -220,11 +234,14 @@ fn inner(mut iter: Chars, mut subject: Vec<Element>) -> Vec<Element> {
 
 fn new_tag(mut iter: Chars, subject: Vec<Element>) -> Vec<Element> {
     // let mut new_element = Element::new();
-    match iter.next() {
-        Some('<') => {
-            return identifier(iter, subject)
-        },
-        Some(er) => unexpected(iter, er, "symbol", "<"),
-        None => return subject,
-    };
+    loop {
+        match iter.next() {
+            Some('<') => {
+                return identifier(iter, subject)
+            },
+            Some(ch) if ch.is_whitespace() => continue,
+            Some(er) => unexpected(iter, er, "symbol", "<"),
+            None => return subject,
+        };
+    }
 }
