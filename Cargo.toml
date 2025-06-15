@@ -1,6 +1,5 @@
 [package]
-name = "html-parser"
+name = "websocket"
 version = "0.1.0"
-edition = "2018"
-description = "A state machine based xml parser"
+edition = "2024"
 
