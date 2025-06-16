@@ -6,7 +6,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-fn main() -> Result<()> {
+pub fn client() -> Result<()> {
     let mut io = TcpStream::connect("127.0.0.1:3000")?;
     let mut buf = BytesMut::new();
     buf.put(&[0u8;2048][..]);
